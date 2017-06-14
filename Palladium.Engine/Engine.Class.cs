@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 namespace com.akoimeexx.network.palladium.engine {
     public partial class Engine {
 #region Properties
+        /// <summary>
+        /// Picked as a joke...
+        /// </summary>
         private const int PORT = 13370;
         private readonly UdpClient _receiver;
         private IAsyncResult _rxResult;
