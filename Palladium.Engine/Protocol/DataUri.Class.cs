@@ -127,14 +127,16 @@
                 using (FileStream fs = File.Open(
                     path, FileMode.Open, FileAccess.Read
                 )) {
+                    byte[] b = new byte[fs.Length];
+                    fs.Read(b, 0, Convert.ToInt32(fs.Length));
                     o = new DataUri() {
-                        Data = new byte[(int)fs.Length], 
+                        Data = Convert.ToBase64String(b), 
                         MediaType = MediaTypes.ApplicationOctet
                     };
-                    int count, sum = 0;
-                    while ((count = fs.Read(
-                        (byte[])o.Data, sum, (int)fs.Length - sum
-                    )) > 0) { sum += count; }
+                    //int count, sum = 0;
+                    //while ((count = fs.Read(
+                    //    (byte[])o.Data, sum, (int)fs.Length - sum
+                    //)) > 0) { sum += count; }
                     o._metaData.Add(
                         metaDataTypes.Filename, Path.GetFileName(path)
                     );
@@ -154,7 +156,9 @@
                     path, FileMode.OpenOrCreate, FileAccess.Write
                 )) {
                     fs.SetLength(0);
-                    byte[] data = d.Data as byte[] ?? new byte[] { };
+                    byte[] data = Convert.FromBase64String(
+                        d.Data as string ?? String.Empty
+                    );
                     fs.Write(data, 0, data.Length);
                 }
             } finally { b = File.Exists(path); }

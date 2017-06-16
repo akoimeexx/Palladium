@@ -55,6 +55,18 @@
             }
         }
         /// <summary>
+        /// Announces receipt and compliance of a message Packet. I know "Roger" and "Wilco" are generally not used together (Wilco inferring Roger already), but goddamnit it's my protocol and I can slip in Space Quest references if I want.
+        /// </summary>
+        public static Packet MessageReceived {
+            get {
+                return new Packet() {
+                    Source = null,
+                    Destination = System.Net.IPAddress.Broadcast.ToString(),
+                    Contents = new DataUri() { Data = "ROGER WILCO" } // Heh, Space Quest...
+                };
+            }
+        }
+        /// <summary>
         /// Announces a user has changed their nickname and clients should update accordingly
         /// </summary>
         public static Packet NickAnnouncement {
@@ -121,7 +133,7 @@
         /// </summary>
         private string source {
             get { return Source?.ToString() ?? String.Empty; }
-            set { Source = new User(); }
+            set { Source = User.FromString(value); }
         }
         [DataMember]
         public string Destination { get; set; } = default(string);

@@ -122,7 +122,7 @@ namespace UnitTests.Palladium.Engine {
                 "username", 
                 "machinename"
             );
-            Assert.AreEqual(expected, u.ToString());
+            Assert.AreEqual(true, u.ToString().StartsWith(expected));
         }
     }
 }

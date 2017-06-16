@@ -1,6 +1,7 @@
 ﻿namespace com.akoimeexx.network.palladium.protocol {
     using System;
     using System.Collections.Generic;
+    using System.Text.RegularExpressions;
 
     public partial class User {
 #region Properties
@@ -37,14 +38,39 @@
     }
     public partial class User {
 #region Methods
+        public static User FromString(string user) {
+            User u = default(User);
+            try {
+                if (!String.IsNullOrWhiteSpace(user)) {
+                    if (!new Regex(
+                        @".+\\.+@.+:.*;.+"
+                    ).IsMatch(user)) throw new ArgumentException(
+                        "user string does not match the specified pattern"
+                    );
+                    string[] s = user.Split(
+                        new char[] { '\\', '@', ':', ';' }
+                    );
+                    u = new User() {
+                        Domain = s[0] ?? String.Empty, 
+                        InstanceId = Guid.Empty, 
+                        Machine = s[2] ?? String.Empty, 
+                        Name = s[1] ?? String.Empty,
+                        Nick = s[3] ?? String.Empty, 
+                    };
+                    if (!String.IsNullOrWhiteSpace(s[4])) 
+                        u.Keys.Public = s[4];
+                }
+            } finally { }
+            return u;
+        }
         public override string ToString() {
-            return String.Format(@"{0}\{1}@{2}{3}", 
+            return String.Format(@"{0}\{1}@{2}:{3};{4}", 
                 Domain, 
                 Name, 
                 Machine, 
                 !String.IsNullOrWhiteSpace(Nick) ? 
-                    String.Format(":{0}", Nick) : 
-                    String.Empty
+                    Nick : String.Empty, 
+                Keys.Public
             );
         }
 #endregion Methods

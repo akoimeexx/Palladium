@@ -6,12 +6,14 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace com.akoimeexx.network.palladium.engine {
+    using com.akoimeexx.network.palladium.protocol;
+
     public partial class Engine {
 #region Properties
         /// <summary>
         /// Picked as a joke...
         /// </summary>
-        private const int PORT = 13370;
+        internal const int PORT = 13370;
         private readonly UdpClient _receiver;
         private IAsyncResult _rxResult;
 
@@ -37,7 +39,7 @@ namespace com.akoimeexx.network.palladium.engine {
             );
         }
         private void receiveTransmission(IAsyncResult result) {
-            protocol.Packet packet = default(protocol.Packet);
+            Packet packet = default(Packet);
             TransmissionStatus status = default(TransmissionStatus);
             try {
                 status = 
@@ -55,7 +57,7 @@ namespace com.akoimeexx.network.palladium.engine {
 
                 IPEndPoint rxEndPoint = new IPEndPoint(IPAddress.Any, Port);
                 if (
-                    protocol.Packet.TryParse(
+                    Packet.TryParse(
                         Encoding.UTF8.GetString(
                             _receiver.EndReceive(result, ref rxEndPoint)
                         ), 
@@ -81,9 +83,8 @@ namespace com.akoimeexx.network.palladium.engine {
         /// 
         /// </summary>
         /// <param name="packet"></param>
-        public void Send(protocol.Packet packet) {
+        public void Send(Packet packet) {
             TransmissionStatus status = default(TransmissionStatus);
-            Console.WriteLine("TX");
             try {
                 status =
                     TransmissionStatus.Sending | 
