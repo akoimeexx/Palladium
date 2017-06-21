@@ -49,6 +49,7 @@ namespace com.akoimeexx.network.palladium.engine {
                 if (disposing) {
                     // TODO: dispose managed state (managed objects).
                     Logout();
+                    _client.Close();
                     _client = null;
                 }
 
@@ -80,14 +81,13 @@ namespace com.akoimeexx.network.palladium.engine {
                 throw new ArgumentNullException(nameof(recipient));
             if (DataUri.Equals(message, default(DataUri)))
                 throw new ArgumentNullException(nameof(message));
-
+            
             Packet p = Packets.UserMessage;
             p.Destination = recipient.ToString();
             p.Source = CurrentUser;
-            message.Data = recipient.Keys.Encrypt(
-                message.Data.ToString()
+            p.Contents = recipient.Keys.Encrypt(
+                message.ToString()
             );
-            p.Contents = message;
             sendPacket(p);
         }
         public void Message(object channel, DataUri message) {
@@ -101,8 +101,8 @@ namespace com.akoimeexx.network.palladium.engine {
                 args.Packet.Destination ==
                     Packets.LoginAnnouncement.Destination && 
                 String.Equals(
-                    args.Packet.Contents.Data.ToString(),
-                    Packets.LoginAnnouncement.Contents.Data.ToString()
+                    new DataUri(args.Packet.Contents).Data.ToString(),
+                    new DataUri(Packets.LoginAnnouncement.Contents).Data.ToString()
                 )
             ) {
                 Users.Add(args.Packet.Source);
@@ -121,9 +121,11 @@ namespace com.akoimeexx.network.palladium.engine {
                 )
             ) {
                 Packet p = args.Packet;
-                p.Contents.Data = CurrentUser.Keys.Decrypt(
-                    args.Packet.Contents.Data.ToString()
-                );
+                p.Contents = CurrentUser.Keys.Decrypt(args.Packet.Contents);
+                
+                //new DataUri(p.Contents).Data = new DataUri(CurrentUser.Keys.Decrypt(
+                //    args.Packet.Contents
+                //)).Data;
                 Messages.Add(p);
                 Packet r = Packets.MessageReceived;
                 r.Source = CurrentUser;
@@ -137,8 +139,8 @@ namespace com.akoimeexx.network.palladium.engine {
                 args.Packet.Destination ==
                     Packets.LogoutAnnouncement.Destination && 
                 String.Equals(
-                    args.Packet.Contents.Data.ToString(),
-                    Packets.LogoutAnnouncement.Contents.Data.ToString()
+                    new DataUri(args.Packet.Contents).Data.ToString(),
+                    new DataUri(Packets.LogoutAnnouncement.Contents).Data.ToString()
                 )
             ) {
                 Users.Remove(args.Packet.Source);

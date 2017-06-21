@@ -39,7 +39,6 @@ namespace UnitTests.Palladium.Engine {
                     System.Threading.Thread.Sleep(10);
                     i++;
                 }
-
                 Assert.AreEqual(
                     1, 
                     c.Messages.Count, 
@@ -47,7 +46,7 @@ namespace UnitTests.Palladium.Engine {
                 );
                 Assert.AreEqual(
                     input,
-                    c.Messages[0].Contents.Data.ToString()
+                    new protocol.DataUri(c.Messages[0].Contents).Data.ToString()
                 );
             }
         }
@@ -69,7 +68,7 @@ namespace UnitTests.Palladium.Engine {
                 // we are running multiple clients.
                 c.Message(
                     c.Users[0],
-                    protocol.DataUri.FromFile(inputPath)
+                    protocol.DataUri.ParseFile(inputPath)
                 );
                 i = 0;
                 // Wait for 1 second or message received, whichever comes first
@@ -80,21 +79,21 @@ namespace UnitTests.Palladium.Engine {
                     System.Threading.Thread.Sleep(10);
                     i++;
                 }
-
                 Assert.AreEqual(
                     1,
                     c.Messages.Count,
                     "Timeout exceeded or no message received"
                 );
 
-                string tmpFile = String.Format(
-                    "{0}.txt",
-                    System.IO.Path.GetTempFileName()
+                string tmpFile = System.IO.Path.Combine(
+                    System.IO.Path.GetTempPath(), 
+                    "HelloWorld.txt"
                 );
-                c.Messages[0].Contents.ToFile(tmpFile);
+                new protocol.DataUri(c.Messages[0].Contents).ToFile(System.IO.Path.GetTempPath());
                 Assert.AreEqual(
                     true, 
-                    System.IO.File.Exists(tmpFile)
+                    System.IO.File.Exists(tmpFile),
+                    c.Messages[0].ToJson()
                 );
                 Assert.AreNotEqual(
                     0, new System.IO.FileInfo(tmpFile).Length

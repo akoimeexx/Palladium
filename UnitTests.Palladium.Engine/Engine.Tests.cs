@@ -36,7 +36,7 @@ namespace UnitTests.Palladium.Engine {
             protocol.Packet p = new protocol.Packet() {
                 Contents = new protocol.DataUri() {
                     Data = "Hello world"
-                }
+                }.ToString()
             };
             e.Send(p);
             Assert.AreEqual(p, transmittedPacket);
@@ -55,8 +55,8 @@ namespace UnitTests.Palladium.Engine {
                 i++;
             }
             Assert.AreEqual(
-                p.Contents.Data, 
-                receivedPacket.Contents.Data, 
+                new protocol.DataUri(p.Contents).Data, 
+                new protocol.DataUri(receivedPacket.Contents).Data, 
                 String.Format("Receive Status: {0}", receiveStatus.ToString())
             );
             Assert.AreEqual(
@@ -83,7 +83,7 @@ namespace UnitTests.Palladium.Engine {
             protocol.Packet p = new protocol.Packet() {
                 Contents = new protocol.DataUri() {
                     Data = senderKey.Encrypt(input)
-                }
+                }.ToString()
             };
 
             e.Send(p);
@@ -99,14 +99,14 @@ namespace UnitTests.Palladium.Engine {
             Assert.AreEqual(
                 input, 
                 receiverKeys.Decrypt(
-                    receivedPacket.Contents.Data as string ?? String.Empty
+                    new protocol.DataUri(receivedPacket.Contents).Data as string ?? String.Empty
                 ),
                 String.Format("Receive Status: {0}", receiveStatus.ToString())
             );
             Assert.AreNotEqual(
                 input, 
                 thirdPartyKeys.Decrypt(
-                    receivedPacket.Contents.Data as string ?? String.Empty
+                    new protocol.DataUri(receivedPacket.Contents).Data as string ?? String.Empty
                 ),
                 String.Format("Receive Status: {0}", receiveStatus.ToString())
             );

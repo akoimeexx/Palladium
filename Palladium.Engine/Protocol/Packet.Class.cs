@@ -17,7 +17,7 @@
                 return new Packet() {
                     Source = null, 
                     Destination = "{0}", // Channel.ToString()
-                    Contents = new DataUri() { Data = "ENCODEDMESSAGE" }
+                    Contents = new DataUri() { Data = "ENCODEDMESSAGE" }.ToString()
                 };
             }
         }
@@ -26,7 +26,7 @@
                 return new Packet() {
                     Source = null, // Channel.ToString()
                     Destination = "{0}", // User.ToString()
-                    Contents = new DataUri() { Data = "INVITE {0} {1}" } // Channel Public Key, Channel Private Key
+                    Contents = new DataUri() { Data = "INVITE {0} {1}" }.ToString() // Channel Public Key, Channel Private Key
                 };
             }
         }
@@ -38,7 +38,7 @@
                 return new Packet() {
                     Source = null,
                     Destination = System.Net.IPAddress.Broadcast.ToString(), 
-                    Contents = new DataUri() { Data = "LOGIN" }
+                    Contents = new DataUri() { Data = "LOGIN" }.ToString()
                 };
             }
         }
@@ -50,7 +50,7 @@
                 return new Packet() {
                     Source = null, 
                     Destination = System.Net.IPAddress.Broadcast.ToString(), 
-                    Contents = new DataUri() { Data = "LOGOUT" }
+                    Contents = new DataUri() { Data = "LOGOUT" }.ToString()
                 };
             }
         }
@@ -62,7 +62,7 @@
                 return new Packet() {
                     Source = null,
                     Destination = System.Net.IPAddress.Broadcast.ToString(),
-                    Contents = new DataUri() { Data = "ROGER WILCO" } // Heh, Space Quest...
+                    Contents = new DataUri() { Data = "ROGER WILCO" }.ToString() // Heh, Space Quest...
                 };
             }
         }
@@ -74,7 +74,7 @@
                 return new Packet() {
                     Source = null, 
                     Destination = System.Net.IPAddress.Broadcast.ToString(), 
-                    Contents = new DataUri() { Data = "NICK" }
+                    Contents = new DataUri() { Data = "NICK" }.ToString()
                 };
             }
         }
@@ -86,7 +86,7 @@
                 return new Packet() {
                     Source = null, 
                     Destination = System.Net.IPAddress.Broadcast.ToString(), 
-                    Contents = new DataUri() { Data = "MARCO" }
+                    Contents = new DataUri() { Data = "MARCO" }.ToString()
                 };
             }
         }
@@ -98,7 +98,7 @@
                 return new Packet() {
                     Source = null, 
                     Destination = System.Net.IPAddress.Broadcast.ToString(), 
-                    Contents = new DataUri() { Data = "POLO" }
+                    Contents = new DataUri() { Data = "POLO" }.ToString()
                 };
             }
         }
@@ -110,7 +110,7 @@
                 return new Packet() {
                     Source = null, 
                     Destination = "{0}", // User.ToString()
-                    Contents = new DataUri() { Data = "MESSAGE" }
+                    Contents = new DataUri() { Data = "MESSAGE" }.ToString()
                 };
             }
         }
@@ -137,16 +137,18 @@
         }
         [DataMember]
         public string Destination { get; set; } = default(string);
-        [IgnoreDataMember]
-        public DataUri Contents { get; set; } = default(DataUri);
-        /// <summary>
-        /// Ugly "hack" to properly serialize DataUri Contents as string representation via DataContractJsonSerializer
-        /// </summary>
-        [DataMember(Name="Contents")]
-        private string contents {
-            get { return Contents.ToString(); }
-            set { Contents = DataUri.FromString(value); }
-        }
+        //[IgnoreDataMember]
+        //public DataUri Contents { get; set; } = default(DataUri);
+        ///// <summary>
+        ///// Ugly "hack" to properly serialize DataUri Contents as string representation via DataContractJsonSerializer
+        ///// </summary>
+        //[DataMember(Name="Contents")]
+        //private string contents {
+        //    get { return Contents.ToString(); }
+        //    set { Contents = DataUri.Parse(value); }
+        //}
+        [DataMember]
+        public string Contents { get; set; }
     }
     /// <summary>
     /// 

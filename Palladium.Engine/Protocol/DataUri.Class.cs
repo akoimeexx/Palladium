@@ -5,72 +5,93 @@
     using System.Runtime.Serialization.Formatters.Binary;
     using System.Text.RegularExpressions;
 
-    public partial class DataUri {
+    public sealed partial class DataUri : IDataUri {
 #region Components
-        /// <summary>
-        /// MediaType Values
-        /// </summary>
-        public enum MediaTypes {
+        private const string SCHEME = "data";
+        private enum DataUriMediaTypes {
             // Custom protocol-based type
             ObjectType, // C# Object/<InstanceType>
             // Standard web-based types
-            TextPlain, // Plain text
-            ImageGif, // Image/Gif
-            ImageJpg, // Image/Jpg
-            ImagePng, // Image/Png
-            ImageSvg, // Image/Svg
+            TextPlain,  // Plain text
+            ImageGif,   // Image/Gif
+            ImageJpg,   // Image/Jpg
+            ImagePng,   // Image/Png
+            ImageSvg,   // Image/Svg
             ApplicationOctet // Binary File Transfer
         }
-        internal static readonly Dictionary<MediaTypes, string> mediaTypes = 
-            new Dictionary<MediaTypes, string>() {
-                // Custom protocol-based type
-                { MediaTypes.ObjectType, "object/C#" }, 
-                // Standard web-based types
-                { MediaTypes.TextPlain, "text/plain;charset=utf-8" }, 
-                { MediaTypes.ImageGif, "image/gif" },
-                { MediaTypes.ImageJpg, "image/jpg" },
-                { MediaTypes.ImagePng, "image/png" },
-                { MediaTypes.ImageSvg, "image/svg+xml" },
-                { MediaTypes.ApplicationOctet, "application/octet" },
-            };
-        internal enum metaDataTypes {
-            Filename, 
+        private enum DataUriMetadataTypes {
+            Charset,  // TextPlain encoding charset
+            Filename, // ApplicationOctet file name
+            Syntax,   // TextPlain optional language syntax
+            Type      // ObjectType class instance type
         }
+        private static readonly Dictionary<DataUriMediaTypes, string> mediaTypes = 
+            new Dictionary<DataUriMediaTypes, string>() {
+                // Custom protocol-based type
+                { DataUriMediaTypes.ObjectType, "object/C#" }, // metadata: ;type=TypeName (;type=System.String)
+                // Standard web-based types
+                { DataUriMediaTypes.TextPlain, "text/plain" }, // metadata: ;charset=CHARSET (;charset=utf-8)
+                                                               // optional: ;syntax=language (;syntax=(asm|c|cpp|cs|css|csv|html|js|json|h|xaml|xml|xsd|xsl|xslt))
+                { DataUriMediaTypes.ImageGif, "image/gif" },
+                { DataUriMediaTypes.ImageJpg, "image/jpg" },
+                { DataUriMediaTypes.ImagePng, "image/png" },
+                { DataUriMediaTypes.ImageSvg, "image/svg+xml" },
+                { DataUriMediaTypes.ApplicationOctet, "application/octet" }, // metadata: ;filename=file.ext (;filename=helloworld.exe)
+            };
 #endregion Components
     }
-    public partial class DataUri {
+    public sealed partial class DataUri {
 #region Properties
-        // https://msdn.microsoft.com/en-us/library/system.net.mime(v=vs.110).aspx
-        private Dictionary<metaDataTypes, string> _metaData = 
-            new Dictionary<metaDataTypes, string>();
-        /// <summary>
-        /// Data content type descriptor
-        /// </summary>
-        public MediaTypes MediaType { get; private set; } = default(MediaTypes);
-        /// <summary>
-        /// 
-        /// </summary>
-        public bool IsBase64 { get { return !(_data is string); }}
-        /// <summary>
-        /// 
-        /// </summary>
         public object Data {
             get { return _data; }
             set {
-                MediaType = mediaTypeFromData(value);
+                _mediaType = mediaTypeFromData(value);
+                _metadata.Clear();
+                switch (_mediaType) {
+                    case DataUriMediaTypes.TextPlain:
+                        _metadata.Add(DataUriMetadataTypes.Charset, "utf-8");
+                        break;
+                    case DataUriMediaTypes.ObjectType:
+                        _metadata.Add(
+                            DataUriMetadataTypes.Type, 
+                            value.GetType().FullName
+                        );
+                        break;
+                    default:
+                        break;
+                }
                 _data = value;
             }
         } private object _data = default(object);
+        public bool IsBase64 {
+            get {
+                return (_data == null) ? false : !(_data is string);
+            }
+        }
+        public bool IsFile {
+            get { return _metadata.ContainsKey(DataUriMetadataTypes.Filename); }
+        }
+        private DataUriMediaTypes? _mediaType = default(DataUriMediaTypes?);
+        public IReadOnlyDictionary<string, string> Metadata {
+            get {
+                Dictionary<string, string> d = new Dictionary<string, string>();
+                foreach (var m in _metadata)
+                    d.Add(m.Key.ToString(), m.Value);
+                return d;
+            }
+        } private Dictionary<DataUriMetadataTypes, string> _metadata = 
+            new Dictionary<DataUriMetadataTypes, string>();
+        public string Scheme { get { return SCHEME; } }
 #endregion Properties
     }
-    public partial class DataUri {
+    public sealed partial class DataUri {
 #region Methods
         /// <summary>
         /// Creates an object from a binary-formatted memory stream byte array
         /// </summary>
         /// <param name="bytes">byte array representation of an object</param>
         /// <returns>reverted object</returns>
-        internal static object byteArrayToData(byte[] bytes) {
+        private static object byteArrayToData(byte[] bytes) {
             object o = default(object);
             try {
                 BinaryFormatter bf = new BinaryFormatter();
@@ -86,9 +107,9 @@
         /// </summary>
         /// <param name="data">object to convert</param>
         /// <returns>byte array representation of the object</returns>
-        internal static byte[] dataToByteArray(object data) {
+        private static byte[] dataToByteArray(object data) {
             byte[] b = default(byte[]);
-            try {
+            if (!object.Equals(default(object), data)) try {
                 BinaryFormatter bf = new BinaryFormatter();
                 using (var ms = new MemoryStream()) {
                     bf.Serialize(ms, data);
@@ -98,153 +119,198 @@
             return b;
         }
         /// <summary>
-        /// Creates a binary-formatted memory stream byte array from DataUri instance Data
-        /// </summary>
-        /// <returns>byte array representation of DataUri instance Data</returns>
-        internal byte[] dataToByteArray() {
-            return DataUri.dataToByteArray(Data);
-        }
-        /// <summary>
         /// Selects the appropriate media type for an object
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        internal static MediaTypes mediaTypeFromData(object data) {
-            MediaTypes m = MediaTypes.ObjectType;//default(MediaTypes);
-            try {
-                if (data is string) m = MediaTypes.TextPlain;
+        private static DataUriMediaTypes? mediaTypeFromData(object data) {
+            DataUriMediaTypes? m = default(DataUriMediaTypes);
+            if (!object.Equals(default(object), data)) try {
+                m = DataUriMediaTypes.ObjectType;
+
+                if (data is string) m = DataUriMediaTypes.TextPlain;
             } finally { }
             return m;
         }
-        /// <summary>
-        /// Loads a file into a datauri-style format; specific to Palladium protocol.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns>DataUri instance containing the file</returns>
-        public static DataUri FromFile(string path) {
-            DataUri o = default(DataUri);
-            try {
-                using (FileStream fs = File.Open(
-                    path, FileMode.Open, FileAccess.Read
-                )) {
-                    byte[] b = new byte[fs.Length];
-                    fs.Read(b, 0, Convert.ToInt32(fs.Length));
-                    o = new DataUri() {
-                        Data = Convert.ToBase64String(b), 
-                        MediaType = MediaTypes.ApplicationOctet
-                    };
-                    //int count, sum = 0;
-                    //while ((count = fs.Read(
-                    //    (byte[])o.Data, sum, (int)fs.Length - sum
-                    //)) > 0) { sum += count; }
-                    o._metaData.Add(
-                        metaDataTypes.Filename, Path.GetFileName(path)
-                    );
-                }
-            } finally { }
-            return o;
+        public static DataUri Parse(string dataUriString) {
+            DataUri d = default(DataUri);
+            Regex pattern = new Regex(
+                @"^data:(([a-zA-Z]+\/[^\s,;]+){1}(;[a-zA-Z]+=[^\s,;]+)*)?(;base64)?,(\S*)$"
+            );
+            if (!pattern.IsMatch(dataUriString)) throw new FormatException(
+                String.Format(
+                    "{0} is not a valid DataUri string format", 
+                    nameof(dataUriString)
+                )
+            );
+
+            Match m = pattern.Match(dataUriString);
+            // Get Media Type, if any
+            DataUriMediaTypes? mediaType = default(DataUriMediaTypes?);
+            List<DataUriMediaTypes> keys = new List<DataUriMediaTypes>(mediaTypes.Keys);
+            List<string> values = new List<string>(mediaTypes.Values);
+            if (
+                values.Contains(m.Groups[2].Value)
+            ) mediaType = keys[
+                values.IndexOf(m.Groups[2].Value)
+            ];
+
+            // Get Metadata, if any
+            Dictionary<DataUriMetadataTypes, string> metaData = new Dictionary<DataUriMetadataTypes, string>();
+            foreach (var datum in m.Groups[3].Captures) {
+                string[] keyvalue = datum.ToString().Split('=');
+                DataUriMetadataTypes metaType = default(DataUriMetadataTypes);
+                if (
+                    (keyvalue?.Length ?? 0) > 1 && 
+                    Enum.TryParse(keyvalue[0].Substring(1), true, out metaType)
+                ) metaData.Add(metaType, keyvalue[1]);
+            }
+
+            // Check if Base64-Encoded
+            bool isBase64 = !String.IsNullOrWhiteSpace(m.Groups[4].Value);
+
+            // Get Data, if any
+            string data = m.Groups[5].Value;
+            // Build DataUri object
+            d = new DataUri() {
+                _mediaType = mediaType
+            };
+            foreach (var datum in metaData)
+                d._metadata.Add(datum.Key, datum.Value);
+
+            if (d._mediaType == DataUriMediaTypes.ObjectType) {
+                d._data = DataUri.byteArrayToData(
+                    Convert.FromBase64String(data)
+                );
+            } else if (isBase64) {
+                d._data = Convert.FromBase64String(data);
+            } else {
+                d._data = (String.IsNullOrEmpty(data)) ? 
+                    null : 
+                    Uri.UnescapeDataString(data ?? String.Empty);
+            }
+            return d;
         }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="d"></param>
-        /// <param name="path"></param>
-        public static bool ToFile(DataUri d, string path) {
-            bool b = default(bool);
-            try {
-                using (FileStream fs = File.Open(
-                    path, FileMode.OpenOrCreate, FileAccess.Write
-                )) {
-                    fs.SetLength(0);
-                    byte[] data = Convert.FromBase64String(
-                        d.Data as string ?? String.Empty
+        public static DataUri ParseFile(string path) {
+            DataUri d = default(DataUri);
+            if (File.Exists(path)) {
+                try {
+                    d = new DataUri() {
+                        _data = File.ReadAllBytes(path),
+                        _mediaType = DataUriMediaTypes.ApplicationOctet
+                    };
+                    d._metadata.Add(
+                        DataUriMetadataTypes.Filename, 
+                        Path.GetFileName(path)
                     );
-                    fs.Write(data, 0, data.Length);
+                } finally { }
+            }
+            return d;
+        }
+        public static bool ToFile(DataUri dataUri, string directory) {
+            bool b = default(bool);
+            if (dataUri.IsFile) {
+                try {
+                    File.WriteAllBytes(
+                        Path.Combine(
+                            directory, 
+                            dataUri._metadata[DataUriMetadataTypes.Filename]
+                        ), 
+                        dataUri._data as byte[]
+                    );
+                } finally {
+                    b = File.Exists(Path.Combine(
+                        directory, 
+                        dataUri._metadata[DataUriMetadataTypes.Filename]
+                    ));
                 }
-            } finally { b = File.Exists(path); }
+            }
             return b;
         }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="path"></param>
-        public bool ToFile(string path) { return DataUri.ToFile(this, path); }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="dataUri"></param>
-        /// <returns></returns>
-        public static DataUri FromString(string dataUri) {
-            DataUri o = default(DataUri);
-            try {
-                bool isBase64 = false;
-                List<string> segments = null;
-                var data = default(object);
-
-                // Simple uri pattern matching, not 100% accurate
-                if (!Regex.IsMatch(
-                    dataUri,
-                    @"^data:.*(;base64)?,\S*$", 
-                    RegexOptions.CultureInvariant | 
-                    RegexOptions.IgnoreCase | 
-                    RegexOptions.Multiline
-                )) throw new UriFormatException("Data URI is invalid");
-
-                // Remove data:, split by ',' into two segments (meta data and data)
-                segments = new List<string>(
-                    dataUri.Substring(5).Split(new char[] { ',' }, 2)
-                );
-                if (segments.Count < 2) throw new UriFormatException(
-                    "Not enough Data URI segments to deserialize from string"
-                );
-
-                // Validate whether data is base64-encoded...
-                isBase64 = segments[0].Contains(";base64");
-                // ... then remove ';base64' tag, if applicable
-                segments[0] = segments[0].Replace(";base64", String.Empty);
-
-                // Attempt to decode into a new object
-                MediaTypes m = default(MediaTypes);
-                foreach(KeyValuePair<MediaTypes, string> kvp in mediaTypes) {
-                    if (segments[0].Contains(kvp.Value)) {
-                        m = kvp.Key;
-                        break;
-                    }
-                }
-                o = new DataUri() {
-                    _data = (isBase64) ? byteArrayToData(
-                        Convert.FromBase64String(segments[1])
-                    ) : Uri.UnescapeDataString(segments[1]), 
-                    MediaType = m
-                    //MediaType = mediaTypes.FirstOrDefault(
-                    //    x => segments[0].StartsWith(x.Value)
-                    //).Key
-                };
-
-                // If this is a transferred file, add meta data
-                if (o.MediaType == MediaTypes.ApplicationOctet) {
-
-                }
-            } finally { }
-            return o;
+        public bool ToFile(string directory) {
+            return DataUri.ToFile(this, directory);
         }
         /// <summary>
-        /// Generates a Data URI-based string, with optional meta data for media types such as Application/Octet (downloadable file)
+        /// 
         /// </summary>
-        /// <returns>string representation of a DataUri instance</returns>
+        /// <remarks>
+        /// String formatting syntax: 
+        /// <![CDATA[
+        /// data:[<mediatype>[;attribute=value]...][;base64],<data>
+        /// ]]>
+        /// </remarks>
+        /// <returns></returns>
         public override string ToString() {
-            return String.Format(
-                "data:{0}{1},{2}",
-                // Media Type
-                mediaTypes[MediaType],
-                // Base64-Encoded?
-                (IsBase64) ? ";base64" : String.Empty, 
-                // Data
-                (IsBase64) ? Convert.ToBase64String(
-                    (Data is byte[]) ? (byte[])Data : dataToByteArray()
-                ) : Uri.EscapeDataString((string)Data)
+            // Get mediatype+metadata string
+            string mediaMetaString = default(string);
+            if (
+                !object.Equals(default(DataUriMediaTypes?), _mediaType) &&
+                mediaTypes.ContainsKey((DataUriMediaTypes)_mediaType)
+            ) {
+                mediaMetaString = mediaTypes[(DataUriMediaTypes)_mediaType];
+                if (_metadata.Count > 0) {
+                    List<string> metadata = new List<string>();
+                    foreach (var m in _metadata) metadata.Add(String.Format(
+                        "{0}={1}", 
+                        m.Key.ToString().ToLower(), 
+                        m.Value
+                    ));
+                    mediaMetaString = String.Format(
+                        "{0};{1}",
+                        mediaTypes[(DataUriMediaTypes)_mediaType],
+                        String.Join(";", metadata)
+                    );
+                }
+            }
+
+            // Get data string
+            string datastring = Uri.EscapeDataString(
+                _data?.ToString() ?? String.Empty
             );
+            if (IsBase64) {
+                datastring = "";
+                byte[] b = (_data is byte[]) ? 
+                    _data as byte[] : 
+                    dataToByteArray(_data);
+                if (!object.Equals(default(byte[]), b))
+                    datastring = Convert.ToBase64String(b);
+            }
+            string dataUriString = String.Format("{0}:{1}{2},{3}",
+                Scheme,                              // DataUri Scheme
+                mediaMetaString,                     // Media Type + Metadata
+                IsBase64 ? ";base64" : String.Empty, // Base64 Encoding
+                datastring                           // Data
+            );
+            return dataUriString;
+        }
+        public static bool TryParse(string dataUriString, out DataUri dataUri) {
+            bool b = default(bool);
+            dataUri = default(DataUri);
+            try {
+                dataUri = DataUri.Parse(dataUriString);
+            } finally { b = !object.Equals(default(DataUri), dataUri); }
+            return b;
+        }
+        public static bool TryParseFile(string path, out DataUri dataUri) {
+            bool b = default(bool);
+            dataUri = default(DataUri);
+            try {
+                dataUri = DataUri.ParseFile(path);
+            } finally { b = !object.Equals(default(DataUri), dataUri); }
+            return b;
         }
 #endregion Methods
+    }
+    public sealed partial class DataUri {
+#region Constructors & Destructor
+        public DataUri() { }
+        public DataUri(string dataUriString) {
+            DataUri d = DataUri.Parse(dataUriString);
+            _data = d._data;
+            _metadata = d._metadata;
+            _mediaType = d._mediaType;
+            d = null;
+        }
+#endregion Constructors & Destructor
     }
 }
